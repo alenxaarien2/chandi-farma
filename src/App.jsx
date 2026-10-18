@@ -2,8 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   MapPin, Phone, MessageCircle, PlusCircle, ShieldCheck, Trash2,
   Ban, CheckCircle2, Navigation, Camera, ExternalLink, Search,
-  Sprout, Users, Lock, Unlock, Calculator, X, Cloud, Sparkles, Send, Loader2
+  Sprout, Users, Lock, Unlock, Calculator, X, Cloud, Sparkles, RefreshCw
 } from 'lucide-react';
+
+// --- PERMANENT FIREBASE DATABASE URL (सभी के फोन में अपने आप काम करेगा) ---
+const DEFAULT_FIREBASE_URL = "https://chandibari-farma-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+// --- 21 दिन की समय-सीमा (मिलीसेकंड में) ---
+const TWENTY_ONE_DAYS_MS = 21 * 24 * 60 * 60 * 1000;
 
 // --- फसल / बिचा कैटेगरी (Crop Categories) ---
 const CATEGORIES = [
@@ -17,7 +23,6 @@ const CATEGORIES = [
   { id: 'papaya', nameHi: 'पपीता', nameEn: 'Papaya', icon: '🍈' },
 ];
 
-// --- चांदी फार्म (Chandi Farm) के शुरुआती डिफ़ॉल्ट लिस्टिंग ---
 const INITIAL_SELLERS = [
   {
     id: 'seller_1',
@@ -29,12 +34,13 @@ const INITIAL_SELLERS = [
     priceUnit: 'per_100',
     capacity: '40,000 पौधे (Plants)',
     address: 'चांदी बाज़ार, मुख्य नर्सरी रोड, जिला नालंदा, बिहार (803108)',
-    mapLink: 'https://www.google.com/maps/search/?api=1&query=25.3265,85.4048',
+    mapLink: 'https://www.google.com/maps?q=25.3265,85.4048',
     extraLink: '',
     lat: 25.3265,
     lng: 85.4048,
     verified: true,
     createdAt: 'आज',
+    timestamp: Date.now(),
     photos: [
       'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=60',
       'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&w=600&q=60',
@@ -52,12 +58,13 @@ const INITIAL_SELLERS = [
     priceUnit: 'per_1',
     capacity: '25,000 पौधे (Plants)',
     address: 'ग्राम चांदी, पंचायत भवन के पास, नालंदा, बिहार',
-    mapLink: 'https://www.google.com/maps/search/?api=1&query=25.3284,85.4227',
+    mapLink: 'https://www.google.com/maps?q=25.3284,85.4227',
     extraLink: '',
     lat: 25.3284,
     lng: 85.4227,
     verified: true,
     createdAt: 'कल',
+    timestamp: Date.now(),
     photos: [
       'https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e?auto=format&fit=crop&w=600&q=60',
       'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=600&q=60',
@@ -74,9 +81,7 @@ const INITIAL_COMMUNITY = [
     text: 'सभी किसान भाइयों का Chandi Farm पर स्वागत है! यहाँ आप अपने खेत का तैयार बिचा (पौधा) सही दाम पर बेच सकते हैं और अपने सबसे नज़दीकी किसान से सीधा संपर्क कर सकते हैं।',
     createdAt: 'अभी',
     isAdmin: true,
-    replies: [
-      { id: 'r1', author: 'महेश किसान', text: 'बहुत बढ़िया ऐप है विजय भाई, अब बिचा खरीदने में आसानी होगी।' }
-    ]
+    replies: []
   }
 ];
 
@@ -124,14 +129,26 @@ function compressImageFile(file, maxWidth = 720, quality = 0.65) {
   });
 }
 
+// 21 दिन से पुराने बिचा को हटाने वाला फ़ंक्शन
+function filterValidSellers(list) {
+  if (!Array.isArray(list)) return [];
+  const now = Date.now();
+  return list.filter((item) => {
+    if (!item.timestamp) return true;
+    return now - item.timestamp < TWENTY_ONE_DAYS_MS;
+  });
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('buy');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const [sellers, setSellers] = useState(() => {
     const saved = localStorage.getItem('cf_sellers_v3');
-    return saved ? JSON.parse(saved) : INITIAL_SELLERS;
+    const parsed = saved ? JSON.parse(saved) : INITIAL_SELLERS;
+    return filterValidSellers(parsed);
   });
 
   const [communityPosts, setCommunityPosts] = useState(() => {
@@ -144,8 +161,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // डिफ़ॉल्ट रूप से आपका Firebase URL हमेशा जुड़ा रहेगा
   const [firebaseDbUrl, setFirebaseDbUrl] = useState(() => {
-    return localStorage.getItem('cf_firebase_url') || '';
+    return localStorage.getItem('cf_firebase_url') || DEFAULT_FIREBASE_URL;
   });
 
   const [buyerLocation, setBuyerLocation] = useState({
@@ -198,42 +216,62 @@ export default function App() {
     localStorage.setItem('cf_blocked_phones', JSON.stringify(blockedPhones));
   }, [blockedPhones]);
 
+  // --- क्लाउड से ताज़ा डेटा खींचने का फ़ंक्शन ---
   const syncFromCloud = async () => {
-    if (!firebaseDbUrl) return;
+    const activeUrl = (firebaseDbUrl || DEFAULT_FIREBASE_URL).replace(/\/$/, '');
+    if (!activeUrl) return null;
     try {
-      const cleanUrl = firebaseDbUrl.replace(/\/$/, '');
-      const res = await fetch(`${cleanUrl}/chandifarm.json`);
+      setSyncing(true);
+      const res = await fetch(`${activeUrl}/chandifarm.json`);
       if (res.ok) {
         const data = await res.json();
-        if (data?.sellers) setSellers(data.sellers);
-        if (data?.community) setCommunityPosts(data.community);
-        if (data?.blocked) setBlockedPhones(data.blocked);
+        if (data) {
+          const validSellers = data.sellers ? filterValidSellers(data.sellers) : INITIAL_SELLERS;
+          const validCommunity = data.community || INITIAL_COMMUNITY;
+          const validBlocked = data.blocked || [];
+          setSellers(validSellers);
+          setCommunityPosts(validCommunity);
+          setBlockedPhones(validBlocked);
+          return { sellers: validSellers, community: validCommunity, blocked: validBlocked };
+        }
       }
     } catch (e) {
       console.error('Cloud sync error:', e);
+    } finally {
+      setSyncing(false);
     }
+    return null;
   };
 
+  // --- क्लाउड पर सुरक्षित रूप से डेटा सेव करने का फ़ंक्शन ---
   const pushToCloud = async (uSellers, uCommunity, uBlocked) => {
-    if (!firebaseDbUrl) return;
+    const activeUrl = (firebaseDbUrl || DEFAULT_FIREBASE_URL).replace(/\/$/, '');
+    if (!activeUrl) return;
     try {
-      const cleanUrl = firebaseDbUrl.replace(/\/$/, '');
-      await fetch(`${cleanUrl}/chandifarm.json`, {
+      setSyncing(true);
+      await fetch(`${activeUrl}/chandifarm.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sellers: uSellers ?? sellers,
+          sellers: filterValidSellers(uSellers ?? sellers),
           community: uCommunity ?? communityPosts,
           blocked: uBlocked ?? blockedPhones
         })
       });
     } catch (e) {
       console.error('Cloud push error:', e);
+    } finally {
+      setSyncing(false);
     }
   };
 
+  // हर 12 सेकंड में ऑटोमैटिक डेटा सिंक होता रहेगा ताकि नया डेटा तुरंत दिखे
   useEffect(() => {
-    if (firebaseDbUrl) syncFromCloud();
+    syncFromCloud();
+    const interval = setInterval(() => {
+      syncFromCloud();
+    }, 12000);
+    return () => clearInterval(interval);
   }, [firebaseDbUrl]);
 
   const detectBuyerLocation = () => {
@@ -282,7 +320,8 @@ export default function App() {
       async (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(5));
         const lng = Number(pos.coords.longitude.toFixed(5));
-        const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        // 100% काम करने वाला सीधा Google Maps लिंक
+        const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
         let detectedAddress = sellerForm.address;
 
         try {
@@ -303,11 +342,11 @@ export default function App() {
           address: detectedAddress || prev.address
         }));
         setSellerGpsLoading(false);
-        setFormMessage({ type: 'success', text: 'सफलतापूर्वक आपकी लाइव लोकेशन जुड़ गई है!' });
+        setFormMessage({ type: 'success', text: 'सफलतापूर्वक आपकी लाइव लोकेशन और मैप जुड़ गया है!' });
       },
       () => {
         setSellerGpsLoading(false);
-        setFormMessage({ type: 'error', text: 'लोकेशन नहीं मिल पाई।' });
+        setFormMessage({ type: 'error', text: 'लोकेशन नहीं मिल पाई। कृपया अपने फोन का GPS ऑन करें।' });
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -336,7 +375,8 @@ export default function App() {
     setIsCompressing(false);
   };
 
-  const handleSellerSubmit = (e) => {
+  // --- नया बिचा सबमिट करते समय पहले क्लाउड का डेटा मिलाकर सेव करना ---
+  const handleSellerSubmit = async (e) => {
     e.preventDefault();
     const cleanPhone = sellerForm.phone.replace(/\D/g, '').slice(-10);
 
@@ -353,9 +393,15 @@ export default function App() {
       return;
     }
 
-    const finalMapLink =
-      sellerForm.mapLink.trim() ||
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sellerForm.address)}`;
+    // सटीक Google Map लिंक बनाना
+    let finalMapLink = sellerForm.mapLink.trim();
+    if (!finalMapLink) {
+      if (sellerForm.lat && sellerForm.lng) {
+        finalMapLink = `https://www.google.com/maps?q=${sellerForm.lat},${sellerForm.lng}`;
+      } else {
+        finalMapLink = `https://www.google.com/maps?q=${encodeURIComponent(sellerForm.address.trim())}`;
+      }
+    }
 
     const newListing = {
       id: 'seller_' + Date.now(),
@@ -372,16 +418,21 @@ export default function App() {
       lat: sellerForm.lat,
       lng: sellerForm.lng,
       verified: false,
-      createdAt: 'अभी',
+      createdAt: new Date().toLocaleDateString('hi-IN'),
+      timestamp: Date.now(), // 21 दिन का हिसाब रखने के लिए
       photos:
         sellerForm.photos.length > 0
           ? sellerForm.photos.map((p) => p.dataUrl)
           : ['https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&w=600&q=60']
     };
 
-    const updated = [newListing, ...sellers];
+    // पहले क्लाउड से ताज़ा लिस्ट मंगाएं ताकि किसी दूसरे किसान का डेटा डिलीट न हो
+    const latestCloud = await syncFromCloud();
+    const baseSellers = latestCloud?.sellers || sellers;
+    const updated = filterValidSellers([newListing, ...baseSellers]);
+
     setSellers(updated);
-    pushToCloud(updated, communityPosts, blockedPhones);
+    await pushToCloud(updated, latestCloud?.community || communityPosts, latestCloud?.blocked || blockedPhones);
 
     setSellerForm({
       sellerName: '',
@@ -404,7 +455,7 @@ export default function App() {
   };
 
   const processedSellers = useMemo(() => {
-    return sellers
+    return filterValidSellers(sellers)
       .filter((s) => !blockedPhones.includes(s.phone))
       .filter((s) => (selectedCategory === 'all' ? true : s.category === selectedCategory))
       .filter((s) => {
@@ -418,7 +469,10 @@ export default function App() {
       })
       .map((s) => {
         const distanceKm = calculateDistanceKm(buyerLocation.lat, buyerLocation.lng, s.lat, s.lng);
-        return { ...s, distanceKm };
+        const daysLeft = s.timestamp
+          ? Math.max(1, Math.ceil((TWENTY_ONE_DAYS_MS - (Date.now() - s.timestamp)) / (1000 * 60 * 60 * 24)))
+          : 21;
+        return { ...s, distanceKm, daysLeft };
       })
       .sort((a, b) => {
         if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
@@ -428,30 +482,30 @@ export default function App() {
       });
   }, [sellers, blockedPhones, selectedCategory, searchQuery, buyerLocation]);
 
-  const handleDeleteSeller = (id) => {
+  const handleDeleteSeller = async (id) => {
     const updated = sellers.filter((s) => s.id !== id);
     setSellers(updated);
-    pushToCloud(updated, communityPosts, blockedPhones);
+    await pushToCloud(updated, communityPosts, blockedPhones);
   };
 
-  const handleToggleVerify = (id) => {
+  const handleToggleVerify = async (id) => {
     const updated = sellers.map((s) => (s.id === id ? { ...s, verified: !s.verified } : s));
     setSellers(updated);
-    pushToCloud(updated, communityPosts, blockedPhones);
+    await pushToCloud(updated, communityPosts, blockedPhones);
   };
 
-  const handleBlockPhone = (phone) => {
+  const handleBlockPhone = async (phone) => {
     const clean = phone.replace(/\D/g, '').slice(-10);
     if (clean.length !== 10) return;
     const uBlocked = Array.from(new Set([...blockedPhones, clean]));
     const uSellers = sellers.filter((s) => s.phone !== clean);
     setBlockedPhones(uBlocked);
     setSellers(uSellers);
-    pushToCloud(uSellers, communityPosts, uBlocked);
+    await pushToCloud(uSellers, communityPosts, uBlocked);
     setBlockPhoneInput('');
   };
 
-  const handleCreatePost = (e) => {
+  const handleCreatePost = async (e) => {
     e.preventDefault();
     const cleanPhone = newPost.phone.replace(/\D/g, '').slice(-10);
     if (blockedPhones.includes(cleanPhone)) {
@@ -466,13 +520,15 @@ export default function App() {
       phone: cleanPhone,
       category: newPost.category,
       text: newPost.text.trim(),
-      createdAt: 'अभी',
+      createdAt: new Date().toLocaleDateString('hi-IN'),
       isAdmin,
       replies: []
     };
-    const updated = [postObj, ...communityPosts];
+    const latestCloud = await syncFromCloud();
+    const baseCommunity = latestCloud?.community || communityPosts;
+    const updated = [postObj, ...baseCommunity];
     setCommunityPosts(updated);
-    pushToCloud(sellers, updated, blockedPhones);
+    await pushToCloud(latestCloud?.sellers || sellers, updated, latestCloud?.blocked || blockedPhones);
     setNewPost({ author: '', phone: '', category: 'cauliflower', text: '' });
   };
 
@@ -498,15 +554,24 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowAdminModal(true)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              isAdmin ? 'bg-amber-400 text-emerald-950' : 'bg-emerald-950/60 text-emerald-100 border border-emerald-700'
-            }`}
-          >
-            {isAdmin ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            <span>{isAdmin ? 'Admin चालू' : 'संचालक पैनल'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={syncFromCloud}
+              title="ताज़ा डेटा लोड करें"
+              className="p-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-emerald-100 transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowAdminModal(true)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                isAdmin ? 'bg-amber-400 text-emerald-950' : 'bg-emerald-950/60 text-emerald-100 border border-emerald-700'
+              }`}
+            >
+              {isAdmin ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              <span>{isAdmin ? 'Admin चालू' : 'संचालक पैनल'}</span>
+            </button>
+          </div>
         </div>
 
         {/* TAB SWITCHER */}
@@ -627,6 +692,12 @@ export default function App() {
                         : (Number(qty) * seller.price).toFixed(0)
                       : null;
 
+                  // हमेशा काम करने वाला मैप लिंक
+                  const workingMapUrl =
+                    seller.lat && seller.lng
+                      ? `https://www.google.com/maps?q=${seller.lat},${seller.lng}`
+                      : `https://www.google.com/maps?q=${encodeURIComponent(seller.address)}`;
+
                   return (
                     <div
                       key={seller.id}
@@ -685,11 +756,14 @@ export default function App() {
                             <h3 className="text-sm font-extrabold text-slate-900">{seller.varietyName}</h3>
                             <p className="text-xs font-bold text-slate-600">👨‍🌾 विक्रेता: {seller.sellerName}</p>
                           </div>
-                          {seller.distanceKm !== null && !isNearest && (
-                            <span className="text-xs font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-200">
-                              📍 {seller.distanceKm} km
-                            </span>
-                          )}
+                          <div className="text-right">
+                            {seller.distanceKm !== null && !isNearest && (
+                              <span className="text-xs font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-200 block">
+                                📍 {seller.distanceKm} km
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-semibold">⏳ {seller.daysLeft} दिन शेष</span>
+                          </div>
                         </div>
 
                         <div className="bg-slate-50 rounded-xl p-2.5 text-xs space-y-1.5 border border-slate-200">
@@ -702,12 +776,12 @@ export default function App() {
                           </div>
                           <div className="pt-1 flex gap-2">
                             <a
-                              href={seller.mapLink}
+                              href={workingMapUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100"
                             >
-                              <MapPin className="w-3 h-3" /> Google Map रास्ता <ExternalLink className="w-2.5 h-2.5" />
+                              <MapPin className="w-3 h-3" /> Google Map पर रास्ता देखें <ExternalLink className="w-2.5 h-2.5" />
                             </a>
                           </div>
                         </div>
@@ -780,7 +854,7 @@ export default function App() {
           <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="bg-emerald-900 text-white p-4">
               <h2 className="text-sm font-extrabold">🌱 अपना बिचा बेचने के लिए फॉर्म भरें</h2>
-              <p className="text-xs text-emerald-200 mt-0.5">अपनी सही जानकारी, रेट और खेत की 4 फोटो अपलोड करें।</p>
+              <p className="text-xs text-emerald-200 mt-0.5">आपका डाला गया बिचा सभी किसानों को तुरंत दिखेगा और 21 दिन बाद अपने आप हट जाएगा।</p>
             </div>
 
             <form onSubmit={handleSellerSubmit} className="p-4 space-y-4 text-xs">
@@ -893,9 +967,9 @@ export default function App() {
                     type="button"
                     onClick={detectSellerLocation}
                     disabled={sellerGpsLoading}
-                    className="bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold"
+                    className="bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-sm"
                   >
-                    {sellerGpsLoading ? 'खोज रहा है...' : '📍 GPS लोकेशन भरें'}
+                    {sellerGpsLoading ? 'खोज रहा है...' : '📍 1-Click GPS लोकेशन भरें'}
                   </button>
                 </div>
                 <input
@@ -906,13 +980,11 @@ export default function App() {
                   onChange={(e) => setSellerForm((prev) => ({ ...prev, address: e.target.value }))}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl"
                 />
-                <input
-                  type="url"
-                  placeholder="Google Map लिंक (ऑटोमेटिक)"
-                  value={sellerForm.mapLink}
-                  onChange={(e) => setSellerForm((prev) => ({ ...prev, mapLink: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px]"
-                />
+                {sellerForm.lat && (
+                  <p className="text-[11px] text-emerald-800 font-bold">
+                    ✅ GPS निर्देशांक जुड़ गए हैं ({sellerForm.lat}, {sellerForm.lng}) — मैप एकदम सटीक खुलेगा!
+                  </p>
+                )}
               </div>
 
               <div>
@@ -943,8 +1015,8 @@ export default function App() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold py-3 rounded-xl shadow">
-                ✅ बिचा लाइव पब्लिश करें
+              <button type="submit" disabled={syncing} className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold py-3 rounded-xl shadow">
+                {syncing ? 'पब्लिश हो रहा है...' : '✅ बिचा लाइव पब्लिश करें'}
               </button>
             </form>
           </div>
@@ -1000,14 +1072,14 @@ export default function App() {
                       </span>
                       <span className="text-slate-400 text-[10px]">{p.createdAt}</span>
                     </div>
-                    <h4 className="font-extrabold text-slate-900">{p.author} {p.isAdmin && '⭐ (संपादक)'}</h4>
+                    <h4 className="font-extrabold text-slate-900">{p.author} {p.isAdmin && '⭐ (संचालक)'}</h4>
                     <p className="text-slate-700">{p.text}</p>
                     {isAdmin && (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const updated = communityPosts.filter((item) => item.id !== p.id);
                           setCommunityPosts(updated);
-                          pushToCloud(sellers, updated, blockedPhones);
+                          await pushToCloud(sellers, updated, blockedPhones);
                         }}
                         className="text-red-600 font-bold"
                       >
@@ -1034,7 +1106,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ADMIN MODAL */}
+      {/* ADMIN MODAL (पिन अब गुप्त रखा गया है) */}
       {showAdminModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-4 space-y-3 text-xs">
@@ -1045,19 +1117,23 @@ export default function App() {
 
             {!isAdmin ? (
               <div className="space-y-2">
-                <p className="text-slate-600">एडमिन पिन डालें (डिफ़ॉल्ट: <code className="font-bold">2026</code>)</p>
+                <p className="text-slate-600">केवल संचालक (Vijay) के लिए। कृपया गुप्त पिन दर्ज करें:</p>
                 <div className="flex gap-2">
                   <input
                     type="password"
-                    placeholder="पिन (2026)"
+                    placeholder="गुप्त पिन डालें"
                     value={adminPinInput}
                     onChange={(e) => setAdminPinInput(e.target.value)}
                     className="flex-1 px-3 py-2 border rounded-xl font-bold"
                   />
                   <button
                     onClick={() => {
-                      if (adminPinInput === adminPin) setIsAdmin(true);
-                      else alert('गलत पिन!');
+                      if (adminPinInput === adminPin) {
+                        setIsAdmin(true);
+                        setAdminPinInput('');
+                      } else {
+                        alert('गलत पिन!');
+                      }
                     }}
                     className="bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold"
                   >
@@ -1068,7 +1144,7 @@ export default function App() {
             ) : (
               <div className="space-y-3">
                 <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-900 font-medium">
-                  ✅ एडमिन मोड सक्रिय है। आप किसी भी पोस्ट को हटा सकते हैं या नंबर ब्लॉक कर सकते हैं।
+                  ✅ एडमिन मोड सक्रिय है। क्लाउड डेटाबेस सभी फोनों के लिए जुड़ा हुआ है।
                 </div>
                 <div className="space-y-1">
                   <span className="font-bold">स्पैम नंबर ब्लॉक करें:</span>
@@ -1088,17 +1164,16 @@ export default function App() {
                 </div>
                 <div className="space-y-1 pt-2">
                   <span className="font-bold flex items-center gap-1">
-                    <Cloud className="w-3.5 h-3.5 text-blue-600" /> Firebase Realtime DB URL (क्लाउड सिंक):
+                    <Cloud className="w-3.5 h-3.5 text-blue-600" /> Firebase Realtime DB URL:
                   </span>
                   <input
                     type="url"
-                    placeholder="https://your-app.firebaseio.com"
                     value={firebaseDbUrl}
                     onChange={(e) => {
                       setFirebaseDbUrl(e.target.value);
                       localStorage.setItem('cf_firebase_url', e.target.value);
                     }}
-                    className="w-full px-3 py-1.5 border rounded-lg"
+                    className="w-full px-3 py-1.5 border rounded-lg text-[11px]"
                   />
                 </div>
                 <button onClick={() => setIsAdmin(false)} className="w-full bg-slate-800 text-white py-2 rounded-xl font-bold">
@@ -1116,7 +1191,7 @@ export default function App() {
         <p>संचालक: <strong className="text-emerald-800">Vijay (विजय)</strong></p>
       </footer>
 
-      {/* 🟢 ALENEXAARIEN JSR - AI CHATBOT INTEGRATED */}
+      {/* 🟢 ALENEXAARIEN JSR - AI CHATBOT (HUMANOID VOICE & TEXT) */}
       <AlenexaarienJSR />
     </div>
   );
@@ -1148,6 +1223,8 @@ function AlenexaarienJSR() {
       if (selectedVoice) utterance.voice = selectedVoice;
       utterance.lang = 'hi-IN';
       utterance.rate = isGreeting ? 0.95 : 1.0;
+      utterance.pitch = 1.0;
+
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
@@ -1172,6 +1249,9 @@ function AlenexaarienJSR() {
     }
     const recognition = new SpeechRecognition();
     recognition.lang = 'hi-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
