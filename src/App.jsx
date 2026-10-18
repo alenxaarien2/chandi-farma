@@ -19,18 +19,17 @@ const CATEGORIES = [
   { id: 'brinjal', nameHi: 'बैंगन', nameEn: 'Brinjal', icon: '🍆' },
   { id: 'chilli', nameHi: 'मिर्च', nameEn: 'Chilli', icon: '🌶️' },
   { id: 'cabbage', nameHi: 'पत्तागोभी', nameEn: 'Cabbage', icon: '🥬' },
-  { id: 'onion', nameHi: 'प्याज', nameEn: 'Onion', icon: '🧅' },
   { id: 'papaya', nameHi: 'पपीता', nameEn: 'Papaya', icon: '🍈' },
 ];
 
 const INITIAL_SELLERS = [
   {
     id: 'seller_1',
-    sellerName: 'रामेश्वर प्रसाद (Rameshwar Prasad)',
-    phone: '9876543210',
-    category: 'cauliflower',
+    sellerName: 'alox bhagat',
+    phone: '8226822890',
+    category: 'matcha ',
     varietyName: 'अगेती स्नोबॉल फूलगोभी (Early Snowball)',
-    price: 60,
+    price: 60$,
     priceUnit: 'per_100',
     capacity: '40,000 पौधे (Plants)',
     address: 'चांदी बाज़ार, मुख्य नर्सरी रोड, जिला नालंदा, बिहार (803108)',
