@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   MapPin, Phone, MessageCircle, PlusCircle, ShieldCheck, Trash2,
   Ban, CheckCircle2, Navigation, Camera, ExternalLink, Search,
-  Sprout, Users, Lock, Unlock, Calculator, X, Cloud, Sparkles
+  Sprout, Users, Lock, Unlock, Calculator, X, Cloud, Sparkles, Send, Loader2
 } from 'lucide-react';
-"https://chandibari-farma-default-rtdb.asia-southeast1.firebasedatabase.app/"
+
 // --- फसल / बिचा कैटेगरी (Crop Categories) ---
 const CATEGORIES = [
   { id: 'all', nameHi: 'सभी बिचा', nameEn: 'All Plants', icon: '🌱' },
@@ -26,7 +26,7 @@ const INITIAL_SELLERS = [
     category: 'cauliflower',
     varietyName: 'अगेती स्नोबॉल फूलगोभी (Early Snowball)',
     price: 60,
-    priceUnit: 'per_100', // per_100 or per_1
+    priceUnit: 'per_100',
     capacity: '40,000 पौधे (Plants)',
     address: 'चांदी बाज़ार, मुख्य नर्सरी रोड, जिला नालंदा, बिहार (803108)',
     mapLink: 'https://www.google.com/maps/search/?api=1&query=25.3265,85.4048',
@@ -80,10 +80,9 @@ const INITIAL_COMMUNITY = [
   }
 ];
 
-// --- Haversine Distance Calculator (दूरी मापने की सटीक API) ---
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371; // Earth radius in KM
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -96,7 +95,6 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return Number((R * c).toFixed(1));
 }
 
-// --- Auto Photo Compressor (बड़ी फोटो को ~40KB में बदलने की तकनीक) ---
 function compressImageFile(file, maxWidth = 720, quality = 0.65) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -127,11 +125,10 @@ function compressImageFile(file, maxWidth = 720, quality = 0.65) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('buy'); // 'buy' | 'sell' | 'community'
+  const [activeTab, setActiveTab] = useState('buy');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // --- Persistent Storage State ---
   const [sellers, setSellers] = useState(() => {
     const saved = localStorage.getItem('cf_sellers_v3');
     return saved ? JSON.parse(saved) : INITIAL_SELLERS;
@@ -151,7 +148,6 @@ export default function App() {
     return localStorage.getItem('cf_firebase_url') || '';
   });
 
-  // --- Buyer Live GPS State ---
   const [buyerLocation, setBuyerLocation] = useState({
     lat: null,
     lng: null,
@@ -160,18 +156,15 @@ export default function App() {
     error: ''
   });
 
-  // --- Admin State (Vijay) ---
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPin] = useState('2026');
   const [blockPhoneInput, setBlockPhoneInput] = useState('');
 
-  // --- Modals & Calculators ---
   const [activePhotoModal, setActivePhotoModal] = useState(null);
   const [calcQuantity, setCalcQuantity] = useState({});
 
-  // --- Seller Form State ---
   const [sellerForm, setSellerForm] = useState({
     sellerName: '',
     phone: '',
@@ -191,11 +184,8 @@ export default function App() {
   const [sellerGpsLoading, setSellerGpsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState({ type: '', text: '' });
 
-  // --- Community Form State ---
   const [newPost, setNewPost] = useState({ author: '', phone: '', category: 'cauliflower', text: '' });
-  const [replyInputs, setReplyInputs] = useState({});
 
-  // Save changes locally
   useEffect(() => {
     localStorage.setItem('cf_sellers_v3', JSON.stringify(sellers));
   }, [sellers]);
@@ -208,7 +198,6 @@ export default function App() {
     localStorage.setItem('cf_blocked_phones', JSON.stringify(blockedPhones));
   }, [blockedPhones]);
 
-  // Cloud Sync with Firebase (Optional)
   const syncFromCloud = async () => {
     if (!firebaseDbUrl) return;
     try {
@@ -247,7 +236,6 @@ export default function App() {
     if (firebaseDbUrl) syncFromCloud();
   }, [firebaseDbUrl]);
 
-  // --- Buyer GPS Detect API ---
   const detectBuyerLocation = () => {
     if (!navigator.geolocation) {
       setBuyerLocation((prev) => ({ ...prev, error: 'GPS सपोर्ट उपलब्ध नहीं है।' }));
@@ -270,23 +258,20 @@ export default function App() {
               .filter(Boolean)
               .join(', ');
           }
-        } catch (e) {
-          // Fallback
-        }
+        } catch (e) {}
         setBuyerLocation({ lat, lng, addressText: placeName, loading: false, error: '' });
       },
       () => {
         setBuyerLocation((prev) => ({
           ...prev,
           loading: false,
-          error: 'लोकेशन अनुमति नहीं मिली। कृपया GPS चालू करें।'
+          error: 'लोकेशन अनुमति नहीं मिली।'
         }));
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // --- Seller GPS Auto-Fill API ---
   const detectSellerLocation = () => {
     if (!navigator.geolocation) {
       setFormMessage({ type: 'error', text: 'GPS समर्थित नहीं है।' });
@@ -308,9 +293,7 @@ export default function App() {
           if (data && data.display_name) {
             detectedAddress = data.display_name.split(',').slice(0, 4).join(', ');
           }
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
 
         setSellerForm((prev) => ({
           ...prev,
@@ -320,17 +303,16 @@ export default function App() {
           address: detectedAddress || prev.address
         }));
         setSellerGpsLoading(false);
-        setFormMessage({ type: 'success', text: 'सफलतापूर्वक आपकी लाइव लोकेशन और मैप लिंक जुड़ गया है!' });
+        setFormMessage({ type: 'success', text: 'सफलतापूर्वक आपकी लाइव लोकेशन जुड़ गई है!' });
       },
       () => {
         setSellerGpsLoading(false);
-        setFormMessage({ type: 'error', text: 'लोकेशन नहीं मिल पाई। कृपया खुद पता दर्ज करें।' });
+        setFormMessage({ type: 'error', text: 'लोकेशन नहीं मिल पाई।' });
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // --- Photo Handler ---
   const handlePhotoSelect = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -354,7 +336,6 @@ export default function App() {
     setIsCompressing(false);
   };
 
-  // --- Submit Seller Listing ---
   const handleSellerSubmit = (e) => {
     e.preventDefault();
     const cleanPhone = sellerForm.phone.replace(/\D/g, '').slice(-10);
@@ -364,7 +345,7 @@ export default function App() {
       return;
     }
     if (blockedPhones.includes(cleanPhone)) {
-      setFormMessage({ type: 'error', text: 'यह मोबाइल नंबर संचालक द्वारा ब्लॉक किया गया है।' });
+      setFormMessage({ type: 'error', text: 'यह मोबाइल नंबर ब्लॉक किया गया है।' });
       return;
     }
     if (!sellerForm.sellerName.trim() || !sellerForm.price || !sellerForm.address.trim()) {
@@ -422,7 +403,6 @@ export default function App() {
     setActiveTab('buy');
   };
 
-  // --- Filter and Distance Sort for Buyer ---
   const processedSellers = useMemo(() => {
     return sellers
       .filter((s) => !blockedPhones.includes(s.phone))
@@ -448,7 +428,6 @@ export default function App() {
       });
   }, [sellers, blockedPhones, selectedCategory, searchQuery, buyerLocation]);
 
-  // Admin Controls
   const handleDeleteSeller = (id) => {
     const updated = sellers.filter((s) => s.id !== id);
     setSellers(updated);
@@ -472,7 +451,6 @@ export default function App() {
     setBlockPhoneInput('');
   };
 
-  // Community Post Handler
   const handleCreatePost = (e) => {
     e.preventDefault();
     const cleanPhone = newPost.phone.replace(/\D/g, '').slice(-10);
@@ -499,7 +477,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 pb-24 font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 pb-24 font-sans relative">
       {/* HEADER */}
       <header className="sticky top-0 z-30 bg-emerald-900 text-white shadow-md">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -879,7 +857,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pricing */}
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-2">
                 <label className="block font-extrabold text-amber-950">मूल्य तय करें (Price Unit) *</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -909,7 +886,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Location & GPS */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-extrabold text-emerald-950">खेत का पता और GPS लोकेशन *</span>
@@ -925,7 +901,7 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  placeholder=" पूरा पता (गाँव, प्रखंड, जिला)"
+                  placeholder="पूरा पता (गाँव, प्रखंड, जिला)"
                   value={sellerForm.address}
                   onChange={(e) => setSellerForm((prev) => ({ ...prev, address: e.target.value }))}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl"
@@ -939,7 +915,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Photos with Auto-Compressor */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <span className="font-extrabold text-slate-700">खेत की 4 फोटो ({sellerForm.photos.length}/4)</span>
@@ -1140,89 +1115,71 @@ export default function App() {
         <p className="font-extrabold text-slate-700">Chandi Farm (चांदी फार्म) — सीधा किसान बाज़ार</p>
         <p>संचालक: <strong className="text-emerald-800">Vijay (विजय)</strong></p>
       </footer>
+
+      {/* 🟢 ALENEXAARIEN JSR - AI CHATBOT INTEGRATED */}
+      <AlenexaarienJSR />
     </div>
   );
 }
-// ==========================================================
-// ALENEXAARIEN JSR - CREATED BY ALOX BHAGAT (VOICE & TEXT)
-// ==========================================================
 
+// ==========================================================
+// ALENEXAARIEN JSR - SMART AI CHATBOT (HUMANOID VOICE & TEXT)
+// ==========================================================
 function AlenexaarienJSR() {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [messages, setMessages] = React.useState([]);
-  const [input, setInput] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [isListening, setIsListening] = React.useState(false);
-  const [isSpeaking, setIsSpeaking] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // सबसे बेस्ट ह्यूमनॉइड हिंदी आवाज़ ढूँढने का फंक्शन
   const getNaturalVoice = (voices) => {
     return voices.find(v => v.lang.includes('hi') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Neerja') || v.name.includes('Madhur'))) ||
            voices.find(v => v.lang.includes('hi')) || 
            voices[0];
   };
 
-  // AI को बोलने वाला फंक्शन (Text-to-Speech)
   const speakText = (text, isGreeting = false) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      
       const voices = window.speechSynthesis.getVoices();
       const selectedVoice = getNaturalVoice(voices);
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-
+      if (selectedVoice) utterance.voice = selectedVoice;
       utterance.lang = 'hi-IN';
       utterance.rate = isGreeting ? 0.95 : 1.0;
-      utterance.pitch = 1.0;
-
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
-
       window.speechSynthesis.speak(utterance);
     }
   };
 
-  // जब चैट खुले, तो Alenexaarien JSR खुद बोलकर ग्रीटिंग करे
   const handleOpenChat = () => {
     setIsOpen(true);
     if (messages.length === 0) {
-      const greetingText = "नमस्ते किसान भाई! मैं Alenexaarien JSR हूँ। मुझे अलोक्स भगत जी ने बनाया है। खेती-बाड़ी या किसी भी चीज़ से जुड़ा जो भी सवाल हो, आप मुझसे पूछ सकते हैं।";
-      setMessages([
-        { sender: 'bot', text: greetingText }
-      ]);
-      setTimeout(() => {
-        speakText(greetingText, true);
-      }, 500);
+      const greetingText = "नमस्ते किसान भाई! मैं Alenexaarien JSR हूँ। खेती-बाड़ी, फसल या दुनिया का कोई भी सवाल हो, आप मुझसे लिखकर या बोलकर पूछ सकते हैं।";
+      setMessages([{ sender: 'bot', text: greetingText }]);
+      setTimeout(() => speakText(greetingText, true), 500);
     }
   };
 
-  // माइक से बोलकर सवाल पूछने का फंक्शन
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert('माफ़ करें, आपका ब्राउज़र बोलकर टाइप करने का समर्थन नहीं करता है। कृपया लिखकर पूछें।');
+      alert('माफ़ करें, आपका ब्राउज़र बोलकर टाइप करने का समर्थन नहीं करता है।');
       return;
     }
-
     const recognition = new SpeechRecognition();
     recognition.lang = 'hi-IN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
-
     recognition.onresult = (event) => {
       const speechToText = event.results[0][0].transcript;
       setInput(speechToText);
       sendMessage(speechToText);
     };
-
     recognition.start();
   };
 
@@ -1239,9 +1196,7 @@ function AlenexaarienJSR() {
     }
 
     setLoading(true);
-
-    // यहाँ AI को कड़ा निर्देश दिया गया है कि निर्माता का नाम हमेशा 'अलोक्स भगत' ही बताना है
-    const systemPrompt = "तुम्हारा नाम 'Alenexaarien JSR' है। तुम्हें 'अलोक्स भगत' (Alox Bhagat) ने बनाया है। अगर कोई तुमसे पूछे कि तुम्हें किसने बनाया है या तुम्हारा मालिक कौन है, तो हमेशा गर्व से कहना कि 'मुझे अलोक्स भगत ने बनाया है।' कभी भी भूलकर भी Google, Gemini या OpenAI का नाम मत लेना। हमेशा आसान और दोस्ताना हिंदी में सटीक जवाब देना।";
+    const systemPrompt = "तुम्हारा नाम 'Alenexaarien JSR' है। तुम किसानों और आम लोगों के लिए एक बहुत स्मार्ट AI असिस्टेंट हो जो पूर्णिया, बिहार, या दुनिया की किसी भी भाषा (जैसे मैथिली, भोजपुरी, हिंदी आदि) में बात कर सकते हो। अगर कोई तुमसे विशेष रूप से पूछे कि 'तुम्हें किसने बनाया है?' या 'तुम्हारा मालिक कौन है?', तभी यह उत्तर देना कि 'मुझे अलोक्स भगत (Alox Bhagat) ने बनाया है।' इसके अलावा सामान्य बातचीत में बिना पूछे अपने आप निर्माता का जिक्र बार-बार मत करना। कभी भी भूलकर भी Google, Gemini या OpenAI का नाम मत लेना। हमेशा आसान और दोस्ताना भाषा में सटीक जवाब देना।";
 
     try {
       const res = await fetch('https://text.pollinations.ai/', {
@@ -1258,13 +1213,8 @@ function AlenexaarienJSR() {
       const replyText = await res.text();
       const finalReply = replyText || 'माफ़ करें, अभी जवाब नहीं मिल पाया। दोबारा पूछें।';
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: 'bot', text: finalReply }
-      ]);
-
+      setMessages((prev) => [...prev, { sender: 'bot', text: finalReply }]);
       speakText(finalReply);
-
     } catch (err) {
       const errReply = 'नेटवर्क में थोड़ी दिक्कत है, कृपया एक बार फिर से कोशिश करें।';
       setMessages((prev) => [...prev, { sender: 'bot', text: errReply }]);
@@ -1276,7 +1226,6 @@ function AlenexaarienJSR() {
 
   return (
     <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, fontFamily: 'sans-serif' }}>
-      {/* चैट खोलने का बटन */}
       {!isOpen && (
         <button
           onClick={handleOpenChat}
@@ -1299,200 +1248,39 @@ function AlenexaarienJSR() {
         </button>
       )}
 
-      {/* चैट बॉक्स विंडो */}
       {isOpen && (
-        <div
-          style={{
-            width: '340px',
-            height: '480px',
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            border: '1px solid #bbf7d0'
-          }}
-        >
-          {/* हेडर */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #166534, #15803d)',
-              color: 'white',
-              padding: '14px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-          >
+        <div style={{ width: '340px', height: '480px', backgroundColor: '#ffffff', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #bbf7d0' }}>
+          <div style={{ background: 'linear-gradient(135deg, #166534, #15803d)', color: 'white', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  backgroundColor: '#052e16',
-                  color: '#fde047',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  border: '1px solid #fde047'
-                }}
-              >
-                AJ
-              </div>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#052e16', color: '#fde047', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', border: '1px solid #fde047' }}>AJ</div>
               <div>
                 <div style={{ fontWeight: 'bold', fontSize: '15px' }}>Alenexaarien JSR</div>
-                <div style={{ fontSize: '11px', color: '#bbf7d0' }}>
-                  {isSpeaking ? '🔊 बोल रहा है...' : '● AI सहायक'}
-                </div>
+                <div style={{ fontSize: '11px', color: '#bbf7d0' }}>{isSpeaking ? '🔊 बोल रहा है...' : '● AI सहायक'}</div>
               </div>
             </div>
-            <button
-              onClick={() => {
-                window.speechSynthesis?.cancel();
-                setIsOpen(false);
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'white',
-                fontSize: '18px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              ✕
-            </button>
+            <button onClick={() => { window.speechSynthesis?.cancel(); setIsOpen(false); }} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
           </div>
 
-          {/* मैसेज एरिया */}
-          <div
-            style={{
-              flex: 1,
-              padding: '12px',
-              overflowY: 'auto',
-              backgroundColor: '#f8fafc',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}
-          >
+          <div style={{ flex: 1, padding: '12px', overflowY: 'auto', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {messages.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start',
-                  backgroundColor: m.sender === 'user' ? '#15803d' : '#ffffff',
-                  color: m.sender === 'user' ? '#ffffff' : '#1e293b',
-                  padding: '10px 14px',
-                  borderRadius: '14px',
-                  maxWidth: '82%',
-                  fontSize: '14px',
-                  lineHeight: '1.4',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                  border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                  whiteSpace: 'pre-wrap'
-                }}
-              >
+              <div key={i} style={{ alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start', backgroundColor: m.sender === 'user' ? '#15803d' : '#ffffff', color: m.sender === 'user' ? '#ffffff' : '#1e293b', padding: '10px 14px', borderRadius: '14px', maxWidth: '82%', fontSize: '14px', lineHeight: '1.4', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0', whiteSpace: 'pre-wrap' }}>
                 {m.text}
                 {m.sender === 'bot' && (
-                  <button
-                    onClick={() => speakText(m.text)}
-                    style={{
-                      display: 'block',
-                      marginTop: '6px',
-                      background: '#f1f5f9',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      color: '#15803d',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    🔊 दोबारा सुनें
-                  </button>
+                  <button onClick={() => speakText(m.text)} style={{ display: 'block', marginTop: '6px', background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer', color: '#15803d', fontWeight: 'bold' }}>🔊 दोबारा सुनें</button>
                 )}
               </div>
             ))}
-            {loading && (
-              <div style={{ alignSelf: 'flex-start', fontSize: '12px', color: '#15803d', padding: '6px' }}>
-                Alenexaarien JSR सोच रहा है...
-              </div>
-            )}
-            {isListening && (
-              <div style={{ alignSelf: 'center', fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>
-                🎙️ बोलिए, मैं सुन रहा हूँ...
-              </div>
-            )}
+            {loading && <div style={{ alignSelf: 'flex-start', fontSize: '12px', color: '#15803d', padding: '6px' }}>Alenexaarien JSR सोच रहा है...</div>}
+            {isListening && <div style={{ alignSelf: 'center', fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>🎙️ बोलिए, मैं सुन रहा हूँ...</div>}
           </div>
 
-          {/* टाइपिंग और माइक बार */}
-          <div
-            style={{
-              padding: '10px',
-              borderTop: '1px solid #e2e8f0',
-              display: 'flex',
-              gap: '6px',
-              backgroundColor: '#ffffff',
-              alignItems: 'center'
-            }}
-          >
-            <button
-              onClick={startListening}
-              title="बोलकर पूछने के लिए दबाएं"
-              style={{
-                backgroundColor: isListening ? '#dc2626' : '#22c55e',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '10px 12px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-              }}
-            >
-              🎙️
-            </button>
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="बोलकर या लिखकर पूछें..."
-              style={{
-                flex: 1,
-                padding: '10px',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-                fontSize: '14px',
-                outline: 'none'
-              }}
-            />
-
-            <button
-              onClick={() => sendMessage()}
-              disabled={loading}
-              style={{
-                backgroundColor: '#15803d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '10px 14px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '13px'
-              }}
-            >
-              भेजें
-            </button>
+          <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '6px', backgroundColor: '#ffffff', alignItems: 'center' }}>
+            <button onClick={startListening} title="बोलकर पूछने के लिए दबाएं" style={{ backgroundColor: isListening ? '#dc2626' : '#22c55e', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 12px', cursor: 'pointer', fontSize: '16px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>🎙️</button>
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="बोलकर या लिखकर पूछें..." style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' }} />
+            <button onClick={() => sendMessage()} disabled={loading} style={{ backgroundColor: '#15803d', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>भेजें</button>
           </div>
         </div>
-      )}<AlenexaarienJSR />
+      )}
     </div>
   );
 }
