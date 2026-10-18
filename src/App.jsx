@@ -4,7 +4,7 @@ import {
   Ban, CheckCircle2, Navigation, Camera, ExternalLink, Search,
   Sprout, Users, Lock, Unlock, Calculator, X, Cloud, Sparkles
 } from 'lucide-react';
-
+"https://chandibari-farma-default-rtdb.asia-southeast1.firebasedatabase.app/"
 // --- फसल / बिचा कैटेगरी (Crop Categories) ---
 const CATEGORIES = [
   { id: 'all', nameHi: 'सभी बिचा', nameEn: 'All Plants', icon: '🌱' },
