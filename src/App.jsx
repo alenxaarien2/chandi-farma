@@ -1143,3 +1143,356 @@ export default function App() {
     </div>
   );
 }
+// ==========================================================
+// ALENEXAARIEN JSR - CREATED BY ALOX BHAGAT (VOICE & TEXT)
+// ==========================================================
+
+function AlenexaarienJSR() {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState([]);
+  const [input, setInput] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [isListening, setIsListening] = React.useState(false);
+  const [isSpeaking, setIsSpeaking] = React.useState(false);
+
+  // सबसे बेस्ट ह्यूमनॉइड हिंदी आवाज़ ढूँढने का फंक्शन
+  const getNaturalVoice = (voices) => {
+    return voices.find(v => v.lang.includes('hi') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Neerja') || v.name.includes('Madhur'))) ||
+           voices.find(v => v.lang.includes('hi')) || 
+           voices[0];
+  };
+
+  // AI को बोलने वाला फंक्शन (Text-to-Speech)
+  const speakText = (text, isGreeting = false) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      const voices = window.speechSynthesis.getVoices();
+      const selectedVoice = getNaturalVoice(voices);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+
+      utterance.lang = 'hi-IN';
+      utterance.rate = isGreeting ? 0.95 : 1.0;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // जब चैट खुले, तो Alenexaarien JSR खुद बोलकर ग्रीटिंग करे
+  const handleOpenChat = () => {
+    setIsOpen(true);
+    if (messages.length === 0) {
+      const greetingText = "नमस्ते किसान भाई! मैं Alenexaarien JSR हूँ। मुझे अलोक्स भगत जी ने बनाया है। खेती-बाड़ी या किसी भी चीज़ से जुड़ा जो भी सवाल हो, आप मुझसे पूछ सकते हैं।";
+      setMessages([
+        { sender: 'bot', text: greetingText }
+      ]);
+      setTimeout(() => {
+        speakText(greetingText, true);
+      }, 500);
+    }
+  };
+
+  // माइक से बोलकर सवाल पूछने का फंक्शन
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('माफ़ करें, आपका ब्राउज़र बोलकर टाइप करने का समर्थन नहीं करता है। कृपया लिखकर पूछें।');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'hi-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognition.onresult = (event) => {
+      const speechToText = event.results[0][0].transcript;
+      setInput(speechToText);
+      sendMessage(speechToText);
+    };
+
+    recognition.start();
+  };
+
+  const sendMessage = async (customText = null) => {
+    const textToSend = customText || input;
+    if (!textToSend.trim() || loading) return;
+
+    const userText = textToSend.trim();
+    if (!customText) {
+      setMessages((prev) => [...prev, { sender: 'user', text: userText }]);
+      setInput('');
+    } else {
+      setMessages((prev) => [...prev, { sender: 'user', text: userText }]);
+    }
+
+    setLoading(true);
+
+    // यहाँ AI को कड़ा निर्देश दिया गया है कि निर्माता का नाम हमेशा 'अलोक्स भगत' ही बताना है
+    const systemPrompt = "तुम्हारा नाम 'Alenexaarien JSR' है। तुम्हें 'अलोक्स भगत' (Alox Bhagat) ने बनाया है। अगर कोई तुमसे पूछे कि तुम्हें किसने बनाया है या तुम्हारा मालिक कौन है, तो हमेशा गर्व से कहना कि 'मुझे अलोक्स भगत ने बनाया है।' कभी भी भूलकर भी Google, Gemini या OpenAI का नाम मत लेना। हमेशा आसान और दोस्ताना हिंदी में सटीक जवाब देना।";
+
+    try {
+      const res = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userText }
+          ],
+          model: 'openai'
+        })
+      });
+      const replyText = await res.text();
+      const finalReply = replyText || 'माफ़ करें, अभी जवाब नहीं मिल पाया। दोबारा पूछें।';
+
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'bot', text: finalReply }
+      ]);
+
+      speakText(finalReply);
+
+    } catch (err) {
+      const errReply = 'नेटवर्क में थोड़ी दिक्कत है, कृपया एक बार फिर से कोशिश करें।';
+      setMessages((prev) => [...prev, { sender: 'bot', text: errReply }]);
+      speakText(errReply);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, fontFamily: 'sans-serif' }}>
+      {/* चैट खोलने का बटन */}
+      {!isOpen && (
+        <button
+          onClick={handleOpenChat}
+          style={{
+            background: 'linear-gradient(135deg, #15803d, #166534)',
+            color: 'white',
+            padding: '12px 22px',
+            borderRadius: '50px',
+            border: '2px solid #86efac',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 'bold',
+            fontSize: '15px'
+          }}
+        >
+          <span>🎙️ Alenexaarien JSR</span>
+        </button>
+      )}
+
+      {/* चैट बॉक्स विंडो */}
+      {isOpen && (
+        <div
+          style={{
+            width: '340px',
+            height: '480px',
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid #bbf7d0'
+          }}
+        >
+          {/* हेडर */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #166534, #15803d)',
+              color: 'white',
+              padding: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#052e16',
+                  color: '#fde047',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  border: '1px solid #fde047'
+                }}
+              >
+                AJ
+              </div>
+              <div>
+                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>Alenexaarien JSR</div>
+                <div style={{ fontSize: '11px', color: '#bbf7d0' }}>
+                  {isSpeaking ? '🔊 बोल रहा है...' : '● AI सहायक'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                window.speechSynthesis?.cancel();
+                setIsOpen(false);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                fontSize: '18px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* मैसेज एरिया */}
+          <div
+            style={{
+              flex: 1,
+              padding: '12px',
+              overflowY: 'auto',
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}
+          >
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start',
+                  backgroundColor: m.sender === 'user' ? '#15803d' : '#ffffff',
+                  color: m.sender === 'user' ? '#ffffff' : '#1e293b',
+                  padding: '10px 14px',
+                  borderRadius: '14px',
+                  maxWidth: '82%',
+                  fontSize: '14px',
+                  lineHeight: '1.4',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                  border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
+                  whiteSpace: 'pre-wrap'
+                }}
+              >
+                {m.text}
+                {m.sender === 'bot' && (
+                  <button
+                    onClick={() => speakText(m.text)}
+                    style={{
+                      display: 'block',
+                      marginTop: '6px',
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      color: '#15803d',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    🔊 दोबारा सुनें
+                  </button>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div style={{ alignSelf: 'flex-start', fontSize: '12px', color: '#15803d', padding: '6px' }}>
+                Alenexaarien JSR सोच रहा है...
+              </div>
+            )}
+            {isListening && (
+              <div style={{ alignSelf: 'center', fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>
+                🎙️ बोलिए, मैं सुन रहा हूँ...
+              </div>
+            )}
+          </div>
+
+          {/* टाइपिंग और माइक बार */}
+          <div
+            style={{
+              padding: '10px',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              gap: '6px',
+              backgroundColor: '#ffffff',
+              alignItems: 'center'
+            }}
+          >
+            <button
+              onClick={startListening}
+              title="बोलकर पूछने के लिए दबाएं"
+              style={{
+                backgroundColor: isListening ? '#dc2626' : '#22c55e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+              }}
+            >
+              🎙️
+            </button>
+
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="बोलकर या लिखकर पूछें..."
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '14px',
+                outline: 'none'
+              }}
+            />
+
+            <button
+              onClick={() => sendMessage()}
+              disabled={loading}
+              style={{
+                backgroundColor: '#15803d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px'
+              }}
+            >
+              भेजें
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
