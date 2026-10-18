@@ -16,21 +16,20 @@ const CATEGORIES = [
   { id: 'brinjal', nameHi: 'बैंगन', nameEn: 'Brinjal', icon: '🍆' },
   { id: 'chilli', nameHi: 'मिर्च', nameEn: 'Chilli', icon: '🌶️' },
   { id: 'cabbage', nameHi: 'पत्तागोभी', nameEn: 'Cabbage', icon: '🥬' },
-  { id: 'onion', nameHi: 'प्याज', nameEn: 'Onion', icon: '🧅' },
   { id: 'papaya', nameHi: 'पपीता', nameEn: 'Papaya', icon: '🍈' },
 ];
 
 const INITIAL_SELLERS = [
   {
     id: 'seller_1',
-    sellerName: 'Alox Bhagat',
-    phone: '8226822890',
+    sellerName: 'vijay ',
+    phone: '9507094783',
     category: 'cauliflower',
     varietyName: 'अगेती स्नोबॉल फूलगोभी (Early Snowball)',
     price: 60,
     priceUnit: 'per_100',
     capacity: '40,000 पौधे (Plants)',
-    address: 'चांदी बाज़ार, मुख्य नर्सरी रोड, जिला नालंदा, बिहार (803108)',
+    address: 'chandibari,raniptra , जिला purnea , बिहार',
     mapLink: 'https://www.google.com/maps?q=25.3265,85.4048',
     extraLink: '',
     lat: 25.3265,
@@ -50,8 +49,8 @@ const INITIAL_SELLERS = [
 const INITIAL_COMMUNITY = [
   {
     id: 'post_1',
-    author: 'Alox Bhagat (संचालक)',
-    phone: '8226822890',
+    author: 'vijay (संचालक)',
+    phone: '9507093783',
     category: 'all',
     text: 'सभी किसान भाइयों का Chandi Farm पर स्वागत है! यहाँ आप अपने खेत का तैयार बिचा सही दाम पर बेच सकते हैं।',
     createdAt: 'अभी',
