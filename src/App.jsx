@@ -147,7 +147,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
-  const [adminPin] = useState('2026');
+  const [adminPin] = useState('Cj7mpg@225jsr');
   const [blockPhoneInput, setBlockPhoneInput] = useState('');
 
   const [activePhotoModal, setActivePhotoModal] = useState(null);
