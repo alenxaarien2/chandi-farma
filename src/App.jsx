@@ -16,20 +16,21 @@ const CATEGORIES = [
   { id: 'brinjal', nameHi: 'बैंगन', nameEn: 'Brinjal', icon: '🍆' },
   { id: 'chilli', nameHi: 'मिर्च', nameEn: 'Chilli', icon: '🌶️' },
   { id: 'cabbage', nameHi: 'पत्तागोभी', nameEn: 'Cabbage', icon: '🥬' },
+  { id: 'onion', nameHi: 'प्याज', nameEn: 'Onion', icon: '🧅' },
   { id: 'papaya', nameHi: 'पपीता', nameEn: 'Papaya', icon: '🍈' },
 ];
 
 const INITIAL_SELLERS = [
   {
     id: 'seller_1',
-    sellerName: 'vijay ',
-    phone: '9507094783',
+    sellerName: 'विजय कुमार (Vijay Kumar)',
+    phone: '9876543210',
     category: 'cauliflower',
     varietyName: 'अगेती स्नोबॉल फूलगोभी (Early Snowball)',
     price: 60,
     priceUnit: 'per_100',
     capacity: '40,000 पौधे (Plants)',
-    address: 'chandibari,raniptra , जिला purnea , बिहार',
+    address: 'चांदी बाज़ार, मुख्य नर्सरी रोड, जिला नालंदा, बिहार (803108)',
     mapLink: 'https://www.google.com/maps?q=25.3265,85.4048',
     extraLink: '',
     lat: 25.3265,
@@ -49,8 +50,8 @@ const INITIAL_SELLERS = [
 const INITIAL_COMMUNITY = [
   {
     id: 'post_1',
-    author: 'vijay (संचालक)',
-    phone: '9507093783',
+    author: 'विजय कुमार (संचालक)',
+    phone: '9876543210',
     category: 'all',
     text: 'सभी किसान भाइयों का Chandi Farm पर स्वागत है! यहाँ आप अपने खेत का तैयार बिचा सही दाम पर बेच सकते हैं।',
     createdAt: 'अभी',
@@ -119,13 +120,13 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
 
   const [sellers, setSellers] = useState(() => {
-    const saved = localStorage.getItem('cf_sellers_v4');
+    const saved = localStorage.getItem('cf_sellers_v5');
     const parsed = saved ? JSON.parse(saved) : INITIAL_SELLERS;
     return filterValidSellers(parsed);
   });
 
   const [communityPosts, setCommunityPosts] = useState(() => {
-    const saved = localStorage.getItem('cf_community_v4');
+    const saved = localStorage.getItem('cf_community_v5');
     return saved ? JSON.parse(saved) : INITIAL_COMMUNITY;
   });
 
@@ -154,8 +155,8 @@ export default function App() {
   const [calcQuantity, setCalcQuantity] = useState({});
 
   const [sellerForm, setSellerForm] = useState({
-    sellerName: 'Alox Bhagat',
-    phone: '8226822890',
+    sellerName: '',
+    phone: '',
     category: 'cauliflower',
     varietyName: '',
     price: '',
@@ -172,14 +173,14 @@ export default function App() {
   const [sellerGpsLoading, setSellerGpsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState({ type: '', text: '' });
 
-  const [newPost, setNewPost] = useState({ author: 'Alox Bhagat', phone: '8226822890', category: 'cauliflower', text: '' });
+  const [newPost, setNewPost] = useState({ author: '', phone: '', category: 'cauliflower', text: '' });
 
   useEffect(() => {
-    localStorage.setItem('cf_sellers_v4', JSON.stringify(sellers));
+    localStorage.setItem('cf_sellers_v5', JSON.stringify(sellers));
   }, [sellers]);
 
   useEffect(() => {
-    localStorage.setItem('cf_community_v4', JSON.stringify(communityPosts));
+    localStorage.setItem('cf_community_v5', JSON.stringify(communityPosts));
   }, [communityPosts]);
 
   useEffect(() => {
@@ -280,7 +281,7 @@ export default function App() {
         } catch (e) {}
         setSellerForm((prev) => ({ ...prev, lat, lng, mapLink, address: detectedAddress || prev.address }));
         setSellerGpsLoading(false);
-        setFormMessage({ type: 'success', text: 'सफलतापूर्वक लाइव लोकेशन जुड़ गई है!' });
+        setFormMessage({ type: 'success', text: 'सफलतापूर्वक लाइव लोकेशन और मैप लिंक जुड़ गया है!' });
       },
       () => {
         setSellerGpsLoading(false);
@@ -332,7 +333,7 @@ export default function App() {
 
     const newListing = {
       id: 'seller_' + Date.now(),
-      sellerName: sellerForm.sellerName.trim() || 'Alox Bhagat',
+      sellerName: sellerForm.sellerName.trim(),
       phone: cleanPhone,
       category: sellerForm.category,
       varietyName: sellerForm.varietyName.trim() || 'बिचा पौधा',
@@ -358,8 +359,8 @@ export default function App() {
     await pushToCloud(updated, latestCloud?.community || communityPosts, latestCloud?.blocked || blockedPhones);
 
     setSellerForm({
-      sellerName: 'Alox Bhagat',
-      phone: '8226822890',
+      sellerName: '',
+      phone: '',
       category: 'cauliflower',
       varietyName: '',
       price: '',
@@ -442,7 +443,7 @@ export default function App() {
     const updated = [postObj, ...baseCommunity];
     setCommunityPosts(updated);
     await pushToCloud(latestCloud?.sellers || sellers, updated, latestCloud?.blocked || blockedPhones);
-    setNewPost({ author: 'Alox Bhagat', phone: '8226822890', category: 'cauliflower', text: '' });
+    setNewPost({ author: '', phone: '', category: 'cauliflower', text: '' });
   };
 
   return (
@@ -456,7 +457,7 @@ export default function App() {
                 <h1 className="text-lg sm:text-xl font-extrabold tracking-wide">Chandi Farm</h1>
                 <span className="text-[11px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-bold">चांदी फार्म</span>
               </div>
-              <p className="text-xs text-emerald-200">संचालक: <strong className="text-amber-300">Alox Bhagat (8226822890)</strong></p>
+              <p className="text-xs text-emerald-200">संचालक: <strong className="text-amber-300">विजय कुमार (Vijay Kumar)</strong></p>
             </div>
           </div>
 
@@ -533,7 +534,7 @@ export default function App() {
                   const isNearest = index === 0 && seller.distanceKm !== null;
                   const qty = calcQuantity[seller.id] ?? '';
                   const calculatedCost = qty && Number(qty) > 0 ? (seller.priceUnit === 'per_100' ? ((Number(qty) / 100) * seller.price).toFixed(0) : (Number(qty) * seller.price).toFixed(0)) : null;
-                  const workingMapUrl = seller.lat && seller.lng ? `https://www.google.com/maps?q=${seller.lat},${seller.lng}` : `https://www.google.com/maps?q=${encodeURIComponent(seller.address)}`;
+                  const workingMapUrl = seller.mapLink || (seller.lat && seller.lng ? `https://www.google.com/maps?q=${seller.lat},${seller.lng}` : `https://www.google.com/maps?q=${encodeURIComponent(seller.address)}`);
 
                   return (
                     <div key={seller.id} className={`bg-white rounded-2xl overflow-hidden border shadow-sm ${isNearest ? 'border-2 border-emerald-600 ring-2 ring-emerald-500/10' : 'border-slate-200'}`}>
@@ -628,11 +629,11 @@ export default function App() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-slate-700 mb-1">आपका नाम *</label>
-                  <input type="text" required placeholder="Alox Bhagat" value={sellerForm.sellerName} onChange={(e) => setSellerForm((prev) => ({ ...prev, sellerName: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
+                  <input type="text" required placeholder="जैसे: रामेश्वर प्रसाद" value={sellerForm.sellerName} onChange={(e) => setSellerForm((prev) => ({ ...prev, sellerName: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                 </div>
                 <div>
                   <label className="block font-extrabold text-slate-700 mb-1">मोबाइल नंबर *</label>
-                  <input type="tel" required maxLength={10} placeholder="8226822890" value={sellerForm.phone} onChange={(e) => setSellerForm((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
+                  <input type="tel" required maxLength={10} placeholder="10 अंकों का नंबर" value={sellerForm.phone} onChange={(e) => setSellerForm((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -653,15 +654,21 @@ export default function App() {
                 </div>
                 <input type="number" required min="1" placeholder="मूल्य दर्ज करें (₹)" value={sellerForm.price} onChange={(e) => setSellerForm((prev) => ({ ...prev, price: e.target.value }))} className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl font-bold" />
               </div>
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 space-y-2">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 space-y-2.5">
                 <div className="flex justify-between items-center">
-                  <span className="font-extrabold text-emerald-950">खेत का पता और GPS लोकेशन *</span>
+                  <span className="font-extrabold text-emerald-950">खेत का पता और Google Map लिंक *</span>
                   <button type="button" onClick={detectSellerLocation} disabled={sellerGpsLoading} className="bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-sm">
-                    {sellerGpsLoading ? 'खोज रहा है...' : '📍 1-Click GPS लोकेशन भरें'}
+                    {sellerGpsLoading ? 'खोज रहा है...' : '📍 1-Click GPS लोकेशन'}
                   </button>
                 </div>
-                <input type="text" required placeholder="पूरा पता (गाँव, प्रखंड, जिला)" value={sellerForm.address} onChange={(e) => setSellerForm((prev) => ({ ...prev, address: e.target.value }))} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl" />
-                {sellerForm.lat && <p className="text-[11px] text-emerald-800 font-bold">✅ GPS निर्देशांक जुड़ गए हैं ({sellerForm.lat}, {sellerForm.lng})</p>}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">पूरा पता (गाँव, प्रखंड, जिला):</label>
+                  <input type="text" required placeholder="जैसे: चांदी बाज़ार, नालंदा, बिहार" value={sellerForm.address} onChange={(e) => setSellerForm((prev) => ({ ...prev, address: e.target.value }))} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Google Map रास्ता लिंक (ऑटो-फिल्ड या डालें):</label>
+                  <input type="url" placeholder="https://www.google.com/maps?q=..." value={sellerForm.mapLink} onChange={(e) => setSellerForm((prev) => ({ ...prev, mapLink: e.target.value }))} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-[11px]" />
+                </div>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -698,6 +705,7 @@ export default function App() {
                   {CATEGORIES.map((c) => (<option key={c.id} value={c.id}>{c.icon} {c.nameHi}</option>))}
                 </select>
                 <input type="text" required placeholder="नाम" value={newPost.author} onChange={(e) => setNewPost((prev) => ({ ...prev, author: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border rounded-xl" />
+                <input type="tel" required maxLength={10} placeholder="मोबाइल नंबर" value={newPost.phone} onChange={(e) => setNewPost((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border rounded-xl" />
                 <textarea rows={3} required placeholder="अपना सवाल लिखें..." value={newPost.text} onChange={(e) => setNewPost((prev) => ({ ...prev, text: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border rounded-xl" />
                 <button type="submit" className="w-full bg-emerald-700 text-white font-bold py-2 rounded-xl">पोस्ट करें</button>
               </form>
@@ -733,12 +741,12 @@ export default function App() {
       {showAdminModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-4 space-y-3 text-xs">
-            <div className="flex justify-between items-center border-b pb-2"><h3 className="font-extrabold text-slate-900">संचालक पैनल</h3><button onClick={() => setShowAdminModal(false)}><X className="w-4 h-4" /></button></div>
+            <div className="flex justify-between items-center border-b pb-2"><h3 className="font-extrabold text-slate-900">संचालक पैनल (Vijay Admin)</h3><button onClick={() => setShowAdminModal(false)}><X className="w-4 h-4" /></button></div>
             {!isAdmin ? (
               <div className="space-y-2">
-                <p className="text-slate-600">संचालक पिन दर्ज करें:</p>
+                <p className="text-slate-600">केवल संचालक (विजय कुमार) के लिए पिन दर्ज करें:</p>
                 <div className="flex gap-2">
-                  <input type="password" placeholder="पिन" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} className="flex-1 px-3 py-2 border rounded-xl font-bold" />
+                  <input type="password" placeholder="पिन (2026)" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} className="flex-1 px-3 py-2 border rounded-xl font-bold" />
                   <button onClick={() => { if (adminPinInput === adminPin) { setIsAdmin(true); setAdminPinInput(''); } else { alert('गलत पिन!'); } }} className="bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold">लॉगिन</button>
                 </div>
               </div>
@@ -746,7 +754,7 @@ export default function App() {
               <div className="space-y-3">
                 <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-900 font-medium">✅ एडमिन मोड सक्रिय है।</div>
                 <div className="space-y-1">
-                  <span className="font-bold">नंबर ब्लॉक करें:</span>
+                  <span className="font-bold">स्पैम नंबर ब्लॉक करें:</span>
                   <div className="flex gap-2">
                     <input type="tel" maxLength={10} placeholder="10 अंक" value={blockPhoneInput} onChange={(e) => setBlockPhoneInput(e.target.value)} className="flex-1 px-3 py-1.5 border rounded-lg" />
                     <button onClick={() => handleBlockPhone(blockPhoneInput)} className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold">ब्लॉक</button>
@@ -761,15 +769,17 @@ export default function App() {
 
       <footer className="max-w-4xl mx-auto px-4 mt-8 text-center text-xs text-slate-500">
         <p className="font-extrabold text-slate-700">Chandi Farm (चांदी फार्म) — सीधा किसान बाज़ार</p>
-        <p>संचालक: <strong className="text-emerald-800">Alox Bhagat (8226822890)</strong></p>
+        <p>संचालक: <strong className="text-emerald-800">विजय कुमार (Vijay Kumar)</strong></p>
       </footer>
 
-      {/* ULTRA-FAST GEMINI STYLE VOICE AI CHATBOT */}
       <AlenexaarienJSR />
     </div>
   );
 }
 
+// ==========================================================
+// ALENEXAARIEN JSR - SMART AI CHATBOT (HUMANOID VOICE & TEXT)
+// ==========================================================
 function AlenexaarienJSR() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -778,8 +788,8 @@ function AlenexaarienJSR() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const getFastHindiVoice = (voices) => {
-    return voices.find(v => v.lang.includes('hi') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Neerja') || v.name.includes('Madhur') || v.name.includes('Kalpana'))) ||
+  const getNaturalVoice = (voices) => {
+    return voices.find(v => v.lang.includes('hi') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Neerja') || v.name.includes('Madhur'))) ||
            voices.find(v => v.lang.includes('hi')) || 
            voices[0];
   };
@@ -789,10 +799,10 @@ function AlenexaarienJSR() {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
-      const voice = getFastHindiVoice(voices);
-      if (voice) utterance.voice = voice;
+      const selectedVoice = getNaturalVoice(voices);
+      if (selectedVoice) utterance.voice = selectedVoice;
       utterance.lang = 'hi-IN';
-      utterance.rate = 1.05; // सुपर फास्ट और स्मूथ
+      utterance.rate = 1.05;
       utterance.pitch = 1.0;
 
       utterance.onstart = () => setIsSpeaking(true);
@@ -805,7 +815,7 @@ function AlenexaarienJSR() {
   const handleOpenChat = () => {
     setIsOpen(true);
     if (messages.length === 0) {
-      const greeting = "नमस्ते किसान भाई! मैं Alenexaarien JSR हूँ। खेती-बाड़ी, फसल या किसी भी सवाल के लिए मुझसे बात करें।";
+      const greeting = "नमस्ते किसान भाई! मैं Alenexaarien JSR हूँ। खेती-बाड़ी या फसल से जुड़े किसी भी सवाल के लिए मुझसे बात करें।";
       setMessages([{ sender: 'bot', text: greeting }]);
       setTimeout(() => speakText(greeting, true), 300);
     }
@@ -842,7 +852,7 @@ function AlenexaarienJSR() {
     if (!customText) setInput('');
     setLoading(true);
 
-    const systemPrompt = "तुम्हारा नाम 'Alenexaarien JSR' है। तुम किसानों के लिए एक बहुत स्मार्ट, फास्ट और मददगार AI असिस्टेंट हो। यूजर जिस भी भाषा में पूछे (हिंदी, मैथिली, भोजपुरी, अंग्रेजी आदि), उसी भाषा में तुरंत और सटीक जवाब दो। अगर कोई पूछे कि तुम्हें किसने बनाया है या तुम्हारा मालिक कौन है, तभी बताना कि 'मुझे Alox Bhagat ने बनाया है।' बिना पूछे बार-बार निर्माता का जिक्र मत करना। Google, Gemini या OpenAI का नाम कभी मत लेना।";
+    const systemPrompt = "तुम्हारा नाम 'Alenexaarien JSR' है। तुम किसानों के लिए एक बहुत स्मार्ट और मददगार AI असिस्टेंट हो। शुरुआत हमेशा हिंदी में करो। यूजर जिस भी भाषा में पूछे (हिंदी, मैथिली, भोजपुरी, अंग्रेजी आदि), उसी भाषा में तुरंत और सटीक जवाब दो। अगर कोई पूछे कि तुम्हें किसने बनाया है या तुम्हारा मालिक कौन है, तभी बताना कि 'मुझे विजय कुमार ने बनाया है।' बिना पूछे बार-बार निर्माता का जिक्र मत करना। Google, Gemini या OpenAI का नाम कभी मत लेना।";
 
     try {
       const res = await fetch('https://text.pollinations.ai/', {
@@ -906,7 +916,7 @@ function AlenexaarienJSR() {
 
           <div style={{ padding: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '6px', backgroundColor: '#ffffff', alignItems: 'center' }}>
             <button onClick={startListening} title="बोलकर पूछने के लिए दबाएं" style={{ backgroundColor: isListening ? '#dc2626' : '#22c55e', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 12px', cursor: 'pointer', fontSize: '16px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}><Mic className="w-4 h-4" /></button>
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="हिंदी या अन्य भाषा में पूछें..." style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' }} />
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="हिंदी में पूछें..." style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' }} />
             <button onClick={() => sendMessage()} disabled={loading} style={{ backgroundColor: '#15803d', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>भेजें</button>
           </div>
         </div>
